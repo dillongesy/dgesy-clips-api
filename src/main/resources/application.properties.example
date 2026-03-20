@@ -1,0 +1,27 @@
+# Server
+server.port=PORT
+
+# Database
+spring.datasource.url=jdbc:mariadb://SQLSERVERIP:PORT/clipsdb
+spring.datasource.username=clipsapi
+spring.datasource.password=DBPASSWORDPLACEHOLDER
+spring.datasource.driver-class-name=org.mariadb.jdbc.Driver
+
+# JPA
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MariaDBDialect
+
+# File upload limits
+spring.servlet.multipart.max-file-size=600MB
+spring.servlet.multipart.max-request-size=600MB
+
+# File server
+fileserver.url=http://FILESERVERIP:PORT
+
+# JWT
+jwt.secret=JWTSECRETPLACEHOLDER
+jwt.expiration=86400000
+
+# App
+app.max-file-size-bytes=524288000
