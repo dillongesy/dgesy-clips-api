@@ -40,17 +40,8 @@ public class AuthService {
     }
 
     public String login(String username, String password) {
-        System.out.println("Login attempt for: " + username);
-        
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> {
-                    System.out.println("User not found: " + username);
-                    return new RuntimeException("Invalid credentials");
-                });
-
-        System.out.println("User found, banned: " + user.isBanned());
-        System.out.println("Stored hash: " + user.getPasswordHash());
-        System.out.println("Password matches: " + passwordEncoder.matches(password, user.getPasswordHash()));
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (user.isBanned()) {
             throw new RuntimeException("Account suspended");
