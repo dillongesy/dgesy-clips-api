@@ -32,14 +32,19 @@ public class JwtFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+        System.out.println("Request URI: " + request.getRequestURI());
+        System.out.println("Auth header: " + authHeader);
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
+            System.out.println("Token valid: " + jwtUtil.isTokenValid(token));
             if (jwtUtil.isTokenValid(token)) {
                 String username = jwtUtil.extractUsername(token);
                 String role = jwtUtil.extractRole(token);
+                System.out.println("Username: " + username + " Role: " + role);
 
                 userRepository.findByUsername(username).ifPresent(user -> {
+                    System.out.println("User found, banned: " + user.isBanned());
                     if (!user.isBanned()) {
                         var auth = new UsernamePasswordAuthenticationToken(
                                 username,
