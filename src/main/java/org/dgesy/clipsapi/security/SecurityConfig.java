@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/clips/view/**").permitAll()
                 .requestMatchers("/api/clips/stream/**").permitAll()
+                .requestMatchers("/api/clips/thumbnail/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
