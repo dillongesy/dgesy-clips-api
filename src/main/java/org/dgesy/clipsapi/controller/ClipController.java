@@ -93,8 +93,7 @@ public class ClipController {
                     "viewCount", clip.getViewCount(),
                     "createdAt", clip.getCreatedAt().toString(),
                     "streamUrl", "/api/clips/stream/" + clip.getShortId(),
-                    "thumbnailUrl", fileServerUrl + "/thumbnail/" +
-                            clip.getShortId() + ".jpg",
+                    "thumbnailUrl", "/api/clips/thumbnail/" + clip.getShortId(),
                     "owner", clip.getUser().getUsername()
             ));
         } catch (RuntimeException e) {
@@ -104,15 +103,50 @@ public class ClipController {
 
     @GetMapping("/stream/{shortId}")
     public void streamClip(@PathVariable String shortId,
-                           jakarta.servlet.http.HttpServletRequest request,
-                           jakarta.servlet.http.HttpServletResponse response)
+                        jakarta.servlet.http.HttpServletRequest request,
+                        jakarta.servlet.http.HttpServletResponse response)
             throws Exception {
         Clip clip = clipService.getClipByShortId(shortId);
         if (clip.isHidden()) {
             response.setStatus(404);
             return;
         }
-        String videoUrl = fileServerUrl + "/video/" + clip.getFilename();
-        response.sendRedirect(videoUrl);
+
+        String videoUrl = fileServerService.getVideoUrl(clip.getFilename());
+        String rangeHeader = request.getHeader("Range");
+
+        java.net.URL url = new java.net.URL(videoUrl);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+
+        if (rangeHeader != null) {
+            conn.setRequestProperty("Range", rangeHeader);
+        }
+
+        conn.connect();
+
+        response.setStatus(rangeHeader != null ? 206 : 200);
+        response.setContentType("video/mp4");
+
+        String contentRange = conn.getHeaderField("Content-Range");
+        String contentLength = conn.getHeaderField("Content-Length");
+
+        if (contentRange != null) response.setHeader("Content-Range", contentRange);
+        if (contentLength != null) response.setHeader("Content-Length", contentLength);
+        response.setHeader("Accept-Ranges", "bytes");
+
+        try (var in = conn.getInputStream();
+            var out = response.getOutputStream()) {
+            in.transferTo(out);
+        }
+    }
+
+    @GetMapping("/thumbnail/{shortId}")
+    public void thumbnailClip(@PathVariable String shortId,
+                            jakarta.servlet.http.HttpServletResponse response)
+            throws Exception {
+        Clip clip = clipService.getClipByShortId(shortId);
+        String thumbnailUrl = fileServerService.getThumbnailUrl(
+                clip.getShortId() + ".jpg");
+        response.sendRedirect(thumbnailUrl);
     }
 }
