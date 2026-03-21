@@ -147,6 +147,18 @@ public class ClipController {
         Clip clip = clipService.getClipByShortId(shortId);
         String thumbnailUrl = fileServerService.getThumbnailUrl(
                 clip.getShortId() + ".jpg");
-        response.sendRedirect(thumbnailUrl);
+
+        java.net.URL url = new java.net.URL(thumbnailUrl);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.connect();
+
+        response.setContentType("image/jpeg");
+        String contentLength = conn.getHeaderField("Content-Length");
+        if (contentLength != null) response.setHeader("Content-Length", contentLength);
+
+        try (var in = conn.getInputStream();
+            var out = response.getOutputStream()) {
+            in.transferTo(out);
+        }
     }
 }
