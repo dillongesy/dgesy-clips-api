@@ -38,87 +38,83 @@ public class ClipService {
     }
 
     public Clip uploadClip(MultipartFile file, String username) throws IOException, InterruptedException {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("video/")) {
+            throw new RuntimeException("Only video files are allowed");
+        }
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Save original to temp file
         File tempInput = File.createTempFile("upload_", ".tmp");
-        file.transferTo(tempInput);
-
-        // Compress with ffmpeg
         File tempOutput = File.createTempFile("compressed_", ".mp4");
-        ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg", "-i", tempInput.getAbsolutePath(),
-                "-vcodec", "libx264", "-crf", "28",
-                "-acodec", "aac", "-b:a", "128k",
-                "-movflags", "+faststart",
-                "-y", tempOutput.getAbsolutePath()
-        );
-        pb.redirectErrorStream(true);
-        Process process = pb.start();
-        process.waitFor();
+        File thumbFile = File.createTempFile("thumb_", ".jpg");
 
-        byte[] compressed = Files.readAllBytes(tempOutput.toPath());
+        try {
+            file.transferTo(tempInput);
 
-        // Check size after compression
-        if (compressed.length > maxFileSizeBytes) {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "ffmpeg", "-i", tempInput.getAbsolutePath(),
+                    "-vcodec", "libx264", "-crf", "28",
+                    "-acodec", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    "-y", tempOutput.getAbsolutePath()
+            );
+            pb.redirectErrorStream(true);
+            pb.start().waitFor();
+
+            byte[] compressed = Files.readAllBytes(tempOutput.toPath());
+
+            if (compressed.length > maxFileSizeBytes) {
+                throw new RuntimeException("File exceeds 500MB limit after compression");
+            }
+
+            String shortId = UUID.randomUUID().toString().substring(0, 8);
+            String filename = shortId + ".mp4";
+
+            ProcessBuilder thumbPb = new ProcessBuilder(
+                    "ffmpeg", "-i", tempOutput.getAbsolutePath(),
+                    "-ss", "00:00:01",
+                    "-vframes", "1",
+                    "-y", thumbFile.getAbsolutePath()
+            );
+            thumbPb.redirectErrorStream(true);
+            thumbPb.start().waitFor();
+
+            ProcessBuilder durationPb = new ProcessBuilder(
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    tempOutput.getAbsolutePath()
+            );
+            Process durationProcess = durationPb.start();
+            String durationStr = new String(durationProcess.getInputStream().readAllBytes()).trim();
+            int duration = (int) Double.parseDouble(durationStr);
+
+            fileServerService.storeVideo(filename, compressed);
+            fileServerService.storeThumbnail(shortId + ".jpg",
+                    Files.readAllBytes(thumbFile.toPath()));
+
+            Clip clip = new Clip();
+            clip.setShortId(shortId);
+            clip.setUser(user);
+            clip.setFilename(filename);
+            clip.setOriginalName(file.getOriginalFilename());
+            clip.setSizeBytes(compressed.length);
+            clip.setDurationSeconds(duration);
+            clip.setPrivate(true);
+            clipRepository.save(clip);
+
+            user.setStorageUsedBytes(user.getStorageUsedBytes() + compressed.length);
+            userRepository.save(user);
+
+            return clip;
+
+        } finally {
             tempInput.delete();
             tempOutput.delete();
-            throw new RuntimeException("File exceeds 500MB limit after compression");
+            thumbFile.delete();
         }
-
-        // Generate short ID and filename
-        String shortId = UUID.randomUUID().toString().substring(0, 8);
-        String filename = shortId + ".mp4";
-
-        // Generate thumbnail
-        File thumbFile = File.createTempFile("thumb_", ".jpg");
-        ProcessBuilder thumbPb = new ProcessBuilder(
-                "ffmpeg", "-i", tempOutput.getAbsolutePath(),
-                "-ss", "00:00:01",
-                "-vframes", "1",
-                "-y", thumbFile.getAbsolutePath()
-        );
-        thumbPb.redirectErrorStream(true);
-        thumbPb.start().waitFor();
-
-        // Get duration
-        ProcessBuilder durationPb = new ProcessBuilder(
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                tempOutput.getAbsolutePath()
-        );
-        Process durationProcess = durationPb.start();
-        String durationStr = new String(durationProcess.getInputStream().readAllBytes()).trim();
-        int duration = (int) Double.parseDouble(durationStr);
-
-        // Store files on file server
-        fileServerService.storeVideo(filename, compressed);
-        fileServerService.storeThumbnail(shortId + ".jpg",
-                Files.readAllBytes(thumbFile.toPath()));
-
-        // Cleanup temp files
-        tempInput.delete();
-        tempOutput.delete();
-        thumbFile.delete();
-
-        // Save clip metadata
-        Clip clip = new Clip();
-        clip.setShortId(shortId);
-        clip.setUser(user);
-        clip.setFilename(filename);
-        clip.setOriginalName(file.getOriginalFilename());
-        clip.setSizeBytes(compressed.length);
-        clip.setDurationSeconds(duration);
-        clip.setPrivate(true);
-        clipRepository.save(clip);
-
-        // Update user storage
-        user.setStorageUsedBytes(user.getStorageUsedBytes() + compressed.length);
-        userRepository.save(user);
-
-        return clip;
     }
 
     public List<Clip> getUserClips(String username) {
