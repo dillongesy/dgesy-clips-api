@@ -67,9 +67,9 @@ public class AdminController {
 
     @DeleteMapping("/clips/{shortId}")
     public ResponseEntity<?> deleteClip(@PathVariable String shortId,
-                                        @AuthenticationPrincipal UserDetails userDetails) {
+                                        @AuthenticationPrincipal String username) {
         try {
-            clipService.deleteClip(shortId, userDetails.getUsername());
+            clipService.deleteClip(shortId, username);
             return ResponseEntity.ok(Map.of("success", true));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

@@ -31,9 +31,9 @@ public class ClipController {
 
     @PostMapping("/upload")
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file,
-                                    @AuthenticationPrincipal UserDetails userDetails) {
+                                    @AuthenticationPrincipal String username) {
         try {
-            Clip clip = clipService.uploadClip(file, userDetails.getUsername());
+            Clip clip = clipService.uploadClip(file, username);
             return ResponseEntity.ok(Map.of(
                     "shortId", clip.getShortId(),
                     "url", "https://clips.dgesy.org/v/" + clip.getShortId()
@@ -44,22 +44,22 @@ public class ClipController {
     }
 
     @GetMapping("/mine")
-    public ResponseEntity<?> myClips(@AuthenticationPrincipal UserDetails userDetails) {
-        List<Clip> clips = clipService.getUserClips(userDetails.getUsername());
+    public ResponseEntity<?> myClips(@AuthenticationPrincipal String username) {
+        List<Clip> clips = clipService.getUserClips(username);
         return ResponseEntity.ok(clips);
     }
 
     @GetMapping("/shared")
-    public ResponseEntity<?> sharedWithMe(@AuthenticationPrincipal UserDetails userDetails) {
-        List<Clip> clips = clipService.getSharedWithUser(userDetails.getUsername());
+    public ResponseEntity<?> sharedWithMe(@AuthenticationPrincipal String username) {
+        List<Clip> clips = clipService.getSharedWithUser(username);
         return ResponseEntity.ok(clips);
     }
 
     @DeleteMapping("/{shortId}")
     public ResponseEntity<?> delete(@PathVariable String shortId,
-                                    @AuthenticationPrincipal UserDetails userDetails) {
+                                    @AuthenticationPrincipal String username) {
         try {
-            clipService.deleteClip(shortId, userDetails.getUsername());
+            clipService.deleteClip(shortId, username);
             return ResponseEntity.ok(Map.of("success", true));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -68,11 +68,10 @@ public class ClipController {
 
     @PostMapping("/{shortId}/share")
     public ResponseEntity<?> share(@PathVariable String shortId,
-                                   @RequestBody Map<String, String> body,
-                                   @AuthenticationPrincipal UserDetails userDetails) {
+                                @RequestBody Map<String, String> body,
+                                @AuthenticationPrincipal String username) {
         try {
-            clipService.shareClip(shortId, userDetails.getUsername(),
-                    body.get("username"));
+            clipService.shareClip(shortId, username, body.get("username"));
             return ResponseEntity.ok(Map.of("success", true));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
